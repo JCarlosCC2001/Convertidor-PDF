@@ -20,3 +20,11 @@ configuracion_pdf.json
 *.njsproj
 *.sln
 *.swp
+
+# PyInstaller / Compilación
+build/
+dist/
+*.spec
+logo.png
+logo.ico
+

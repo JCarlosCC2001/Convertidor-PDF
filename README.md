@@ -73,36 +73,34 @@ Para configurar el entorno de desarrollo y utilizar la herramienta correctamente
    pip install -r requirements.txt
    ```
 
----
+## 🚀 Instalación y Compilación Automática (Windows)
 
-## 📎 Configuración del Menú Contextual (Anticlick)
+Esta aplicación incluye scripts para compilarse en un ejecutable independiente de Windows que corre de manera silenciosa (sin ventana de consola) y se instala con un solo comando.
 
-Para utilizar esta herramienta directamente haciendo clic derecho en cualquier archivo del explorador:
+### 1. Compilación del Ejecutable Silencioso
+El script `build_exe.py` empaqueta la aplicación en un archivo único (`ConvertidorPDF.exe`) sin ventana de terminal CMD:
+```bash
+python build_exe.py
+```
+*Este comando generará el ejecutable y su respectivo icono premium en la carpeta `dist/`.*
 
-1. Presiona `Windows + R`.
-2. Escribe `shell:sendto` y presiona `Enter`.
-3. Haz clic derecho en el espacio en blanco y selecciona **Nuevo > Acceso directo**.
-4. En el campo de ubicación, agrega la ruta del ejecutable de Python de tu entorno virtual seguida de la ruta del script principal. Ejemplo:
-   ```bash
-   "D:\Desarrollo Software\Convertidor-PDF\.venv\Scripts\python.exe" "D:\Desarrollo Software\Convertidor-PDF\main.py"
-   ```
-5. Asigna un nombre descriptivo al acceso directo (ej. `Convertidor PDF`).
-6. Ahora puedes seleccionar imágenes y archivos Word, hacerles clic derecho, seleccionar **Enviar a > Convertidor PDF** y la aplicación se abrirá con la lista precargada.
+### 2. Instalador Automático
+El script `setup_installer.py` realiza la instalación local de la aplicación en el equipo:
+```bash
+python setup_installer.py
+```
 
----
+**¿Qué hace el instalador automáticamente?**
+- Copia los ejecutables y logos al directorio local `%LOCALAPPDATA%\Programs\ConvertidorPDF` (no requiere permisos de administrador).
+- **Acceso directo en el Escritorio y Menú Inicio**.
+- **Menú Enviar a (SendTo)**: Registra la app en `Enviar a -> Convertidor PDF`, permitiendo seleccionar **múltiples archivos juntos** en el explorador de archivos y abrirlos en una sola ventana de la cola de conversión.
+- **Menú Contextual directo (Anticlick)**: Registra la opción `Convertidor PDF` con su respectivo icono en el menú de clic derecho principal de archivos de Windows.
 
-## 🔍 Solución de Problemas (Troubleshooting)
-
-Si tienes problemas para activar el entorno virtual debido a restricciones de permisos de ejecución en PowerShell:
-
-1. Abre una terminal de PowerShell como Administrador o ejecuta en la terminal actual:
-   ```bash
-   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-   ```
-2. Intenta activar el entorno nuevamente con:
-   ```bash
-   .\.venv\Scripts\Activate.ps1
-   ```
+### 3. Desinstalación
+Si deseas eliminar la aplicación y todas sus integraciones (accesos directos y registro), simplemente ve al directorio del programa o ejecuta:
+```bash
+python %LOCALAPPDATA%\Programs\ConvertidorPDF\uninstall.py
+```
 
 ---
 

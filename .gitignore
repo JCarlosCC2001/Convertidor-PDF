@@ -1,0 +1,22 @@
+# Entornos virtuales
+.venv/
+venv/
+ENV/
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de configuración de usuario local
+configuracion_pdf.json
+
+# IDEs y editores de texto
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

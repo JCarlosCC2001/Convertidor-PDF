@@ -1,1 +1,8 @@
-{"union": "Dividido", "color": "Blanco y Negro", "calidad": "Baja"}
+{
+    "union": "Dividido",
+    "color": "Blanco y Negro",
+    "calidad": "Alta",
+    "carpeta_salida": "",
+    "nombre_archivo": "",
+    "orientacion_auto": true
+}

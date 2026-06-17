@@ -15,6 +15,8 @@ COLOR_ACCENT = "#007acc"
 COLOR_ACCENT_HOVER = "#0099ff"
 COLOR_CARD = "#001a40"
 COLOR_CARD_BORDER = "#003399"
+COLOR_SUCCESS = "#4ec97a"
+
 
 DIR_PROYECTO = os.path.dirname(os.path.abspath(__file__))
 

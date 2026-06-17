@@ -1,7 +1,7 @@
 import sys
 import os
 import json
-from PIL import Image
+from PIL import Image, ImageOps
 import tkinter as tk
 from tkinter import messagebox
 import traceback
@@ -42,7 +42,7 @@ def mostrar_error(titulo, error):
     root.destroy()
 
 def procesar_imagen(ruta_img, modo_color, calidad_elegida):
-    """Procesa la imagen aplicando la resolución y color seleccionados."""
+    """Procesa la imagen para que llene completamente el A4 sin dejar márgenes."""
     config_calidad = CALIDADES[calidad_elegida]
     ancho = config_calidad["ancho"]
     alto = config_calidad["alto"]
@@ -54,15 +54,11 @@ def procesar_imagen(ruta_img, modo_color, calidad_elegida):
     else:
         img = img.convert("RGB")
     
-    lienzo_a4 = Image.new("RGB", (ancho, alto), "white")
+    # ImageOps.fit recorta la imagen de forma inteligente para que llene el tamaño A4 
+    # exacto (ancho y alto) sin estirarse ni deformarse, eliminando los márgenes.
+    img_sin_margen = ImageOps.fit(img, (ancho, alto), method=Image.Resampling.LANCZOS)
     
-    img.thumbnail((ancho, alto), Image.Resampling.LANCZOS)
-    
-    x = (ancho - img.width) // 2
-    y = (alto - img.height) // 2
-    lienzo_a4.paste(img, (x, y))
-    
-    return lienzo_a4
+    return img_sin_margen
 
 def ejecutar_conversion(rutas_imagenes, opcion_union, opcion_color, calidad_elegida):
     """Genera los PDFs y guarda las preferencias del usuario."""

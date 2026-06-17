@@ -3,16 +3,37 @@ import sys
 import shutil
 import winreg
 import subprocess
+import tkinter as tk
+from tkinter import messagebox
+
+# Paleta de colores consistente
+COLOR_BG = "#001333"
+COLOR_HEADER = "#002060"
+COLOR_TEXT_PRIMARY = "#ffffff"
+COLOR_TEXT_MUTED = "#8cadd3"
+COLOR_ACCENT = "#007acc"
+COLOR_ACCENT_HOVER = "#0099ff"
+COLOR_CARD = "#001a40"
+COLOR_CARD_BORDER = "#003399"
 
 DIR_PROYECTO = os.path.dirname(os.path.abspath(__file__))
-RUTA_EXE_ORIGEN = os.path.join(DIR_PROYECTO, "dist", "ConvertidorPDF.exe")
-RUTA_LOGO_ORIGEN = os.path.join(DIR_PROYECTO, "logo.ico")
 
 # Directorio destino de instalación (local del usuario para evitar requerir permisos de admin)
 DIR_INSTALACION = os.path.join(os.environ["LOCALAPPDATA"], "Programs", "ConvertidorPDF")
 RUTA_EXE_DESTINO = os.path.join(DIR_INSTALACION, "ConvertidorPDF.exe")
 RUTA_LOGO_DESTINO = os.path.join(DIR_INSTALACION, "logo.ico")
 RUTA_UNINSTALL_DESTINO = os.path.join(DIR_INSTALACION, "uninstall.py")
+
+
+def obtener_ruta_recurso(nombre_archivo):
+    """Obtiene la ruta absoluta de un recurso, compatible con empaquetado PyInstaller."""
+    if hasattr(sys, "_MEIPASS"):
+        # PyInstaller crea una carpeta temporal y guarda la ruta en sys._MEIPASS
+        return os.path.join(sys._MEIPASS, nombre_archivo)
+    # Si se ejecuta como script, buscar en carpetas de desarrollo
+    if nombre_archivo == "ConvertidorPDF.exe":
+        return os.path.join(DIR_PROYECTO, "dist", "ConvertidorPDF.exe")
+    return os.path.join(DIR_PROYECTO, nombre_archivo)
 
 
 def crear_acceso_directo_powershell(ruta_acceso_directo, ruta_destino_exe, argumentos="", descripcion=""):
@@ -31,7 +52,6 @@ def crear_acceso_directo_powershell(ruta_acceso_directo, ruta_destino_exe, argum
 
 def registrar_menu_contextual():
     """Registra la aplicación en el menú contextual de Windows para archivos individuales (clic derecho directo)."""
-    print("Registrando en el menú contextual (anticlick)...")
     try:
         # HKEY_CURRENT_USER\Software\Classes\*\shell\ConvertidorPDF
         key_path = r"Software\Classes\*\shell\ConvertidorPDF"
@@ -42,23 +62,17 @@ def registrar_menu_contextual():
         # Comando asociado al hacer clic
         cmd_path = key_path + r"\command"
         with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, cmd_path, 0, winreg.KEY_SET_VALUE) as cmd_key:
-            # "%1" representa el archivo seleccionado
             winreg.SetValueEx(cmd_key, "", 0, winreg.REG_SZ, f'"{RUTA_EXE_DESTINO}" "%1"')
-
-        print("Registro en menú contextual completado.")
     except Exception as e:
-        print(f"Error al registrar menú contextual: {e}")
+        raise Exception(f"No se pudo configurar el menú contextual: {e}")
 
 
 def crear_accesos_directos():
     """Crea los accesos directos en Escritorio, Menú Inicio y en la carpeta 'SendTo'."""
-    print("Creando accesos directos...")
-
     # 1. Escritorio
     escritorio = os.path.join(os.environ["USERPROFILE"], "Desktop")
     ruta_desktop = os.path.join(escritorio, "Convertidor PDF.lnk")
     crear_acceso_directo_powershell(ruta_desktop, RUTA_EXE_DESTINO, descripcion="Convertidor de imágenes y Word a PDF")
-    print("Acceso directo creado en Escritorio.")
 
     # 2. Menú Inicio
     menu_inicio = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows", "Start Menu", "Programs")
@@ -66,24 +80,18 @@ def crear_accesos_directos():
     os.makedirs(dir_start_menu, exist_ok=True)
     ruta_start_menu = os.path.join(dir_start_menu, "Convertidor PDF.lnk")
     crear_acceso_directo_powershell(ruta_start_menu, RUTA_EXE_DESTINO, descripcion="Convertidor de imágenes y Word a PDF")
-    print("Acceso directo creado en Menú Inicio.")
 
     # 3. Menú Enviar a (SendTo) - CLAVE PARA MÚLTIPLES ARCHIVOS
     sendto_dir = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows", "SendTo")
     ruta_sendto = os.path.join(sendto_dir, "Convertidor PDF.lnk")
     crear_acceso_directo_powershell(ruta_sendto, RUTA_EXE_DESTINO, descripcion="Convertidor de imágenes y Word a PDF")
-    print("Registrado en el menú 'Enviar a' (SendTo) para múltiples archivos.")
 
 
 def generar_desinstalador():
     """Genera el script uninstall.py dentro del directorio de instalación."""
-    print("Generando desinstalador...")
     script_content = f"""# Script de Desinstalación de Convertidor PDF
 import os
 import winreg
-import subprocess
-
-print("Iniciando desinstalación de Convertidor PDF...")
 
 # 1. Eliminar accesos directos
 accesos_directos = [
@@ -96,11 +104,9 @@ for ruta in accesos_directos:
     if os.path.exists(ruta):
         try:
             os.remove(ruta)
-            print(f"Eliminado acceso directo: {{ruta}}")
-        except Exception as e:
-            print(f"No se pudo eliminar {{ruta}}: {{e}}")
+        except Exception:
+            pass
 
-# Eliminar carpeta en Menú Inicio si está vacía
 dir_start_menu = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows", "Start Menu", "Programs", "Convertidor PDF")
 if os.path.exists(dir_start_menu):
     try:
@@ -109,71 +115,177 @@ if os.path.exists(dir_start_menu):
         pass
 
 # 2. Remover del Registro de Windows
-print("Removiendo del menú contextual...")
 try:
-    # Eliminar comando y luego la clave principal del menú contextual
     winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r"Software\\Classes\\*\\shell\\ConvertidorPDF\\command")
     winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r"Software\\Classes\\*\\shell\\ConvertidorPDF")
-    print("Registro removido del menú contextual.")
-except Exception as e:
-    print(f"Error al eliminar registro: {{e}}")
+except Exception:
+    pass
 
-# 3. Eliminar archivos locales
-print("Eliminando archivos de instalación...")
-# Intentamos agendar la eliminación o borrar los archivos no bloqueados
-# El propio uninstall.py se borrará al final o el usuario podrá borrar la carpeta
-dir_instalacion = r"{DIR_INSTALACION}"
-print(f"Puedes borrar manualmente la carpeta del programa si quedan archivos: {{dir_instalacion}}")
 print("Desinstalación completada con éxito.")
 """
-
     with open(RUTA_UNINSTALL_DESTINO, "w", encoding="utf-8") as f:
         f.write(script_content)
 
 
-def instalar():
-    """Orquesta el proceso de instalación completo."""
-    print("="*60)
-    print("INSTALADOR DE CONVERTIDOR PDF")
-    print("="*60)
+class InstallerGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Instalador - Convertidor PDF")
+        self.root.configure(bg=COLOR_BG)
+        self.root.geometry("460x320")
+        self.root.resizable(False, False)
 
-    # Verificar que el ejecutable compilado existe
-    if not os.path.exists(RUTA_EXE_ORIGEN):
-        print(f"ERROR: No se encontró el ejecutable compilado en {RUTA_EXE_ORIGEN}.")
-        print("Por favor, ejecuta primero 'build_exe.py' para compilar la aplicación.")
-        sys.exit(1)
+        # Centrar ventana
+        pantalla_ancho = self.root.winfo_screenwidth()
+        pantalla_alto = self.root.winfo_screenheight()
+        x = (pantalla_ancho - 460) // 2
+        y = (pantalla_alto - 320) // 2
+        self.root.geometry(f"460x320+{x}+{y}")
 
-    # Crear carpeta de instalación
-    print(f"Creando carpeta de instalación en: {DIR_INSTALACION}...")
-    os.makedirs(DIR_INSTALACION, exist_ok=True)
+        # Intentar cargar icono
+        try:
+            self.root.iconbitmap(obtener_ruta_recurso("logo.ico"))
+        except Exception:
+            pass
 
-    # Copiar ejecutable
-    print("Copiando ejecutable...")
-    shutil.copy2(RUTA_EXE_ORIGEN, RUTA_EXE_DESTINO)
+        self.crear_interfaz()
 
-    # Copiar icono
-    if os.path.exists(RUTA_LOGO_ORIGEN):
-        print("Copiando icono de la aplicación...")
-        shutil.copy2(RUTA_LOGO_ORIGEN, RUTA_LOGO_DESTINO)
-    else:
-        print("Advertencia: No se encontró el icono logo.ico.")
+    def crear_interfaz(self):
+        # Header
+        frame_header = tk.Frame(self.root, bg=COLOR_HEADER, height=55)
+        frame_header.pack(fill="x")
+        frame_header.pack_propagate(False)
 
-    # Generar desinstalador
-    generar_desinstalador()
+        tk.Label(
+            frame_header, text="📄 INSTALACIÓN DE CONVERTIDOR PDF",
+            font=("Segoe UI", 12, "bold"), bg=COLOR_HEADER, fg=COLOR_TEXT_PRIMARY,
+        ).pack(pady=14)
 
-    # Configurar el sistema
-    crear_accesos_directos()
-    registrar_menu_contextual()
+        # Cuerpo
+        self.frame_cuerpo = tk.Frame(self.root, bg=COLOR_BG)
+        self.frame_cuerpo.pack(fill="both", expand=True, padx=25, pady=20)
 
-    print("\n" + "="*60)
-    print("¡CONVERTIDOR PDF INSTALADO EXITOSAMENTE!")
-    print("Puedes usarlo desde:")
-    print(" 1. Tu Escritorio (Acceso directo)")
-    print(" 2. Menú Inicio")
-    print(" 3. Haciendo clic derecho sobre cualquier archivo -> Convertidor PDF")
-    print(" 4. Clic derecho sobre un lote de archivos -> Enviar a -> Convertidor PDF")
-    print("="*60 + "\n")
+        self.lbl_info = tk.Label(
+            self.frame_cuerpo,
+            text="Este asistente instalará el Convertidor PDF en su equipo.\n\n"
+                 "Se configurará el menú contextual para que aparezca la opción "
+                 "al hacer clic derecho sobre sus imágenes o documentos Word.",
+            font=("Segoe UI", 9), bg=COLOR_BG, fg=COLOR_TEXT_PRIMARY,
+            justify="left", wraplength=400,
+        )
+        self.lbl_info.pack(anchor="w", pady=(10, 15))
+
+        self.lbl_ruta = tk.Label(
+            self.frame_cuerpo,
+            text=f"Directorio de instalación:\n{DIR_INSTALACION}",
+            font=("Segoe UI", 8, "italic"), bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
+            justify="left", wraplength=400,
+        )
+        self.lbl_ruta.pack(anchor="w", pady=(0, 20))
+
+        # Botonera
+        self.frame_botones = tk.Frame(self.frame_cuerpo, bg=COLOR_BG)
+        self.frame_botones.pack(fill="x")
+
+        self.btn_instalar = tk.Button(
+            self.frame_botones, text="Instalar", font=("Segoe UI", 9, "bold"),
+            bg=COLOR_ACCENT, fg=COLOR_TEXT_PRIMARY,
+            activebackground=COLOR_ACCENT_HOVER, activeforeground=COLOR_TEXT_PRIMARY,
+            bd=0, width=12, pady=6, cursor="hand2",
+            command=self.ejecutar_instalacion,
+        )
+        self.btn_instalar.pack(side="right", padx=5)
+
+        self.btn_cancelar = tk.Button(
+            self.frame_botones, text="Cancelar", font=("Segoe UI", 9, "bold"),
+            bg=COLOR_HEADER, fg=COLOR_TEXT_PRIMARY,
+            activebackground=COLOR_CARD_BORDER, activeforeground=COLOR_TEXT_PRIMARY,
+            bd=0, width=12, pady=6, cursor="hand2",
+            command=self.root.destroy,
+        )
+        self.btn_cancelar.pack(side="right", padx=5)
+
+        # Estado (Inicialmente oculto)
+        self.lbl_estado = tk.Label(
+            self.frame_cuerpo, text="", font=("Segoe UI", 9, "bold"),
+            bg=COLOR_BG, fg=COLOR_ACCENT,
+        )
+
+    def ejecutar_instalacion(self):
+        """Ejecuta la copia de archivos y registros."""
+        self.btn_instalar.pack_forget()
+        self.btn_cancelar.pack_forget()
+
+        self.lbl_estado.pack(pady=10)
+
+        try:
+            # 1. Rutas de origen
+            exe_origen = obtener_ruta_recurso("ConvertidorPDF.exe")
+            logo_origen = obtener_ruta_recurso("logo.ico")
+
+            if not os.path.exists(exe_origen):
+                raise FileNotFoundError(
+                    "No se encontró el ejecutable interno ConvertidorPDF.exe. "
+                    "Por favor compile la app antes de generar el instalador."
+                )
+
+            # 2. Crear carpeta e instalar
+            self.lbl_estado.config(text="Creando carpetas del sistema...")
+            self.root.update_idletasks()
+            os.makedirs(DIR_INSTALACION, exist_ok=True)
+
+            self.lbl_estado.config(text="Copiando archivos de la aplicación...")
+            self.root.update_idletasks()
+            shutil.copy2(exe_origen, RUTA_EXE_DESTINO)
+
+            if os.path.exists(logo_origen):
+                shutil.copy2(logo_origen, RUTA_LOGO_DESTINO)
+
+            # 3. Desinstalador
+            generar_desinstalador()
+
+            # 4. Accesos directos
+            self.lbl_estado.config(text="Creando accesos directos en Windows...")
+            self.root.update_idletasks()
+            crear_accesos_directos()
+
+            # 5. Registro contextual
+            self.lbl_estado.config(text="Registrando menú contextual (anticlick)...")
+            self.root.update_idletasks()
+            registrar_menu_contextual()
+
+            self.lbl_estado.pack_forget()
+
+            # Pantalla de éxito
+            self.lbl_info.config(
+                text="¡Instalación completada exitosamente!\n\n"
+                     "El programa ya está configurado y listo para usarse.\n"
+                     "• En Escritorio y Menú Inicio.\n"
+                     "• Con clic derecho directo sobre un archivo.\n"
+                     "• Con clic derecho -> Enviar a -> Convertidor PDF (para múltiples archivos).",
+                fg=COLOR_SUCCESS,
+            )
+
+            btn_finalizar = tk.Button(
+                self.frame_botones, text="Finalizar", font=("Segoe UI", 9, "bold"),
+                bg=COLOR_ACCENT, fg=COLOR_TEXT_PRIMARY,
+                activebackground=COLOR_ACCENT_HOVER, activeforeground=COLOR_TEXT_PRIMARY,
+                bd=0, width=15, pady=8, cursor="hand2",
+                command=self.root.destroy,
+            )
+            btn_finalizar.pack(side="right")
+
+        except Exception as e:
+            self.lbl_estado.pack_forget()
+            messagebox.showerror("Error de instalación", f"Ocurrió un error inesperado:\n\n{e}")
+            self.root.destroy()
+
+
+def main():
+    root = tk.Tk()
+    _app = InstallerGUI(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
-    instalar()
+    main()

@@ -41,36 +41,70 @@ def preparar_iconos():
 
 
 def compilar():
-    """Ejecuta PyInstaller para compilar el ejecutable sin consola."""
+    """Ejecuta PyInstaller para compilar la aplicación y luego su instalador."""
     preparar_iconos()
-    print("Iniciando compilación del ejecutable con PyInstaller...")
+    print("Iniciando compilación del ejecutable principal con PyInstaller...")
 
-    # Ejecutar PyInstaller en el entorno virtual
     python_exe = sys.executable  # Usa el python del entorno actual
     pyinstaller_cmd = [
         python_exe, "-m", "PyInstaller",
-        "--onefile",               # Empaquetar todo en un único archivo
+        "--onefile",               # Empaquetar en un único archivo
         "--noconsole",             # No mostrar ventana negra de terminal
         f"--icon={RUTA_LOGO_ICO}", # Icono del ejecutable
         "--name=ConvertidorPDF",   # Nombre del ejecutable
-        # Añadir dependencias opcionales de reportlab y docx que pyinstaller podría omitir
         "--collect-all", "reportlab",
         "--collect-all", "docx",
         RUTA_MAIN
     ]
 
-    print(f"Comando de compilación: {' '.join(pyinstaller_cmd)}")
+    print(f"Comando de compilación principal: {' '.join(pyinstaller_cmd)}")
     result = subprocess.run(pyinstaller_cmd, cwd=DIR_PROYECTO)
 
-    if result.returncode == 0:
-        print("\n" + "="*50)
-        print("¡COMPILACIÓN FINALIZADA CON ÉXITO!")
-        print(f"El ejecutable se encuentra en: {os.path.join(DIR_PROYECTO, 'dist', 'ConvertidorPDF.exe')}")
-        print("="*50 + "\n")
+    if result.returncode != 0:
+        print("Error al compilar la aplicación principal.")
+        sys.exit(1)
+
+    print("\n" + "="*50)
+    print("¡APLICACIÓN PRINCIPAL COMPILADA!")
+    print("="*50 + "\n")
+
+    # --- PASO 2: COMPILAR EL INSTALADOR GRÁFICO AUTÓNOMO ---
+    print("Iniciando compilación del instalador gráfico...")
+
+    ruta_installer_script = os.path.join(DIR_PROYECTO, "setup_installer.py")
+    
+    # Sintaxis de --add-data en Windows: "origen;destino_dentro_del_exe"
+    add_data_exe = f"dist/ConvertidorPDF.exe;."
+    add_data_logo = f"logo.ico;."
+
+    pyinstaller_installer_cmd = [
+        python_exe, "-m", "PyInstaller",
+        "--onefile",
+        "--noconsole",             # El instalador gráfico de Tkinter no necesita consola
+        f"--icon={RUTA_LOGO_ICO}",
+        "--add-data", add_data_exe,
+        "--add-data", add_data_logo,
+        "--name=Instalador_ConvertidorPDF",
+        ruta_installer_script
+    ]
+
+    print(f"Comando de compilación del instalador: {' '.join(pyinstaller_installer_cmd)}")
+    result_installer = subprocess.run(pyinstaller_installer_cmd, cwd=DIR_PROYECTO)
+
+    if result_installer.returncode == 0:
+        print("\n" + "="*60)
+        print("¡PROCESO COMPLETADO EXITOSAMENTE!")
+        print("Archivos generados en la carpeta 'dist/':")
+        print(f" 1. Aplicación: {os.path.join(DIR_PROYECTO, 'dist', 'ConvertidorPDF.exe')}")
+        print(f" 2. Instalador único: {os.path.join(DIR_PROYECTO, 'dist', 'Instalador_ConvertidorPDF.exe')}")
+        print("\n* IMPORTANTE: Puedes enviar solo el 'Instalador_ConvertidorPDF.exe' a cualquier")
+        print("  computadora y al ejecutarlo instalará y configurará todo automáticamente.")
+        print("="*60 + "\n")
     else:
-        print("Error al compilar la aplicación.")
+        print("Error al compilar el instalador.")
         sys.exit(1)
 
 
 if __name__ == "__main__":
     compilar()
+

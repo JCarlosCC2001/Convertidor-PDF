@@ -15,7 +15,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog
 from src.config import (
     CALIDADES, EXTENSIONES_IMAGEN, EXTENSIONES_WORD,
-    cargar_configuracion, clasificar_archivo,
+    cargar_configuracion, clasificar_archivo, VERSION,
 )
 from src.converter import ejecutar_conversion
 
@@ -165,6 +165,9 @@ class ConvertidorGUI:
         # Construir la interfaz gráfica
         self.crear_interfaz()
 
+        # Iniciar verificación de actualizaciones en segundo plano
+        threading.Thread(target=self.verificar_actualizaciones, daemon=True).start()
+
     def centrar_ventana(self, ancho, alto):
         """Centra la ventana principal en la pantalla del usuario."""
         pantalla_ancho = self.root.winfo_screenwidth()
@@ -172,6 +175,49 @@ class ConvertidorGUI:
         x = (pantalla_ancho - ancho) // 2
         y = (pantalla_alto - alto) // 2
         self.root.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+    def verificar_actualizaciones(self):
+        """Consulta la API de GitHub en segundo plano para ver si hay una nueva versión."""
+        import urllib.request
+        import json
+        try:
+            url = "https://api.github.com/repos/JCarlosCC2001/Convertidor-PDF/releases/latest"
+            req = urllib.request.Request(url, headers={"User-Agent": "ConvertidorPDF-Updater"})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                tag_name = data.get("tag_name", "")
+                self.html_url_actualizacion = data.get("html_url", "https://github.com/JCarlosCC2001/Convertidor-PDF/releases")
+                
+                if tag_name:
+                    version_remota = tag_name.strip("vV ")
+                    version_local = VERSION.strip("vV ")
+                    
+                    try:
+                        partes_remotas = [int(x) for x in version_remota.split(".")]
+                        partes_locales = [int(x) for x in version_local.split(".")]
+                        if partes_remotas > partes_locales:
+                            self.root.after(0, self.mostrar_boton_actualizacion, tag_name)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    def mostrar_boton_actualizacion(self, nueva_version):
+        """Muestra de forma estilizada el botón de actualizar en el header."""
+        self.btn_actualizar = tk.Button(
+            self.frame_header, text=f"✨ Actualizar a {nueva_version}",
+            font=("Segoe UI", 9, "bold"), bg=COLOR_ACCENT, fg=COLOR_TEXT_PRIMARY,
+            activebackground=COLOR_ACCENT_HOVER, activeforeground=COLOR_TEXT_PRIMARY,
+            bd=0, padx=10, pady=4, cursor="hand2",
+            command=self.abrir_enlace_actualizacion
+        )
+        self.btn_actualizar.place(relx=1.0, rely=0.5, anchor="e", x=-15)
+
+    def abrir_enlace_actualizacion(self):
+        """Abre el navegador en la página de descargas de GitHub."""
+        import webbrowser
+        url = getattr(self, "html_url_actualizacion", "https://github.com/JCarlosCC2001/Convertidor-PDF/releases")
+        webbrowser.open(url)
 
     def crear_interfaz(self):
         # --- ENCABEZADO ---

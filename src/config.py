@@ -4,6 +4,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# --- Versión de la Aplicación ---
+VERSION = "1.0.0"
+
 # --- Extensiones de archivos soportados ---
 EXTENSIONES_IMAGEN = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"}
 EXTENSIONES_WORD = {".docx"}

@@ -1,119 +1,177 @@
 import sys
 import os
-from PIL import Image, ImageOps
+import json
+from PIL import Image
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox
+import traceback
 
-import traceback # Añade esto arriba con los otros imports
+# Archivo donde se guardarán tus preferencias
+ARCHIVO_CONFIG = "configuracion_pdf.json"
 
-if __name__ == "__main__":
+# Diccionario con las resoluciones según la calidad elegida
+CALIDADES = {
+    "Baja": {"ancho": 595, "alto": 842, "dpi": 72.0, "compresion": 70},   # Calidad original
+    "Media": {"ancho": 1240, "alto": 1754, "dpi": 150.0, "compresion": 85}, # Calidad intermedia
+    "Alta": {"ancho": 2480, "alto": 3508, "dpi": 300.0, "compresion": 100}  # Máxima calidad
+}
+
+def cargar_configuracion():
+    """Carga la última configuración guardada o usa los valores por defecto."""
+    if os.path.exists(ARCHIVO_CONFIG):
+        try:
+            with open(ARCHIVO_CONFIG, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return {"union": "Unido", "color": "A Colores", "calidad": "Alta"}
+
+def guardar_configuracion(union, color, calidad):
+    """Guarda las selecciones actuales para la próxima vez."""
+    config = {"union": union, "color": color, "calidad": calidad}
     try:
-        archivos = sys.argv[1:]
-        if not archivos:
-            # Si se abre vacío, solo salimos
-            sys.exit(0)
-        lanzar_interfaz(archivos)
+        with open(ARCHIVO_CONFIG, "w") as f:
+            json.dump(config, f)
     except Exception as e:
-        # Esto creará un archivo 'error_log.txt' en la misma carpeta si algo falla
-        with open("error_log.txt", "w") as f:
-            f.write(traceback.format_exc())
-# Dimensiones estándar de A4 a 300 DPI (píxeles: 2480 x 3508)
-# Para evitar PDFs gigantescos, usamos una escala estándar de 72 DPI: 595 x 842 puntos
-A4_ANCHO, A4_ALTO = 595, 842
+        print(f"No se pudo guardar la configuración: {e}")
 
-def procesar_imagen(ruta_img, modo_color):
-    """Abre la imagen, la convierte al color deseado y la ajusta a A4 Vertical"""
+def mostrar_error(titulo, error):
+    root = tk.Tk()
+    root.withdraw()
+    messagebox.showerror(titulo, f"Detalle del error técnico:\n\n{error}")
+    root.destroy()
+
+def procesar_imagen(ruta_img, modo_color, calidad_elegida):
+    """Procesa la imagen aplicando la resolución y color seleccionados."""
+    config_calidad = CALIDADES[calidad_elegida]
+    ancho = config_calidad["ancho"]
+    alto = config_calidad["alto"]
+    
     img = Image.open(ruta_img)
     
-    # 1. Configurar color (Blanco y Negro o Colores)
     if modo_color == "Blanco y Negro":
         img = img.convert("L").convert("RGB")
     else:
         img = img.convert("RGB")
     
-    # 2. Ajustar a tamaño A4 Vertical manteniendo la proporción (Letterbox/Proporcional)
-    # Creamos un lienzo blanco tamaño A4
-    lienzo_a4 = Image.new("RGB", (A4_ANCHO, A4_ALTO), "white")
+    lienzo_a4 = Image.new("RGB", (ancho, alto), "white")
     
-    # Redimensionamos la imagen original para que quepa en el A4
-    img.thumbnail((A4_ANCHO, A4_ALTO), Image.Resampling.LANCZOS)
+    img.thumbnail((ancho, alto), Image.Resampling.LANCZOS)
     
-    # Centrar la imagen en el lienzo A4
-    x = (A4_ANCHO - img.width) // 2
-    y = (A4_ALTO - img.height) // 2
+    x = (ancho - img.width) // 2
+    y = (alto - img.height) // 2
     lienzo_a4.paste(img, (x, y))
     
     return lienzo_a4
 
-def ejecutar_conversion(rutas_imagenes, opcion_union, opcion_color):
+def ejecutar_conversion(rutas_imagenes, opcion_union, opcion_color, calidad_elegida):
+    """Genera los PDFs y guarda las preferencias del usuario."""
     try:
-        directorio_salida = os.path.dirname(rutas_imagenes[0])
+        # Guardar la configuración para la próxima vez que se abra el programa
+        guardar_configuracion(opcion_union, opcion_color, calidad_elegida)
         
-        if opcion_union == "Unido (Un solo PDF)":
-            imagenes_listas = [procesar_imagen(r, opcion_color) for r in rutas_imagenes]
+        directorio_salida = os.path.dirname(rutas_imagenes[0])
+        config_calidad = CALIDADES[calidad_elegida]
+        
+        if opcion_union == "Unido":
+            imagenes_listas = [procesar_imagen(r, opcion_color, calidad_elegida) for r in rutas_imagenes]
             ruta_final = os.path.join(directorio_salida, "imagenes_unidas.pdf")
             
-            # Guardar todo en uno
             imagenes_listas[0].save(
-                ruta_final, "PDF", save_all=True, append_images=imagenes_listas[1:]
+                ruta_final, 
+                "PDF", 
+                save_all=True, 
+                append_images=imagenes_listas[1:],
+                resolution=config_calidad["dpi"],
+                quality=config_calidad["compresion"]
             )
             
-        else: # Divididos (Un PDF por cada imagen)
+        else: # Divididos
             for r in rutas_imagenes:
-                img_procesada = procesar_imagen(r, opcion_color)
+                img_procesada = procesar_imagen(r, opcion_color, calidad_elegida)
                 nombre_base = os.path.splitext(os.path.basename(r))[0]
                 ruta_final = os.path.join(directorio_salida, f"{nombre_base}.pdf")
-                img_procesada.save(ruta_final, "PDF")
                 
-        messagebox.showinfo("Éxito", "¡Conversión completada con éxito!")
+                img_procesada.save(
+                    ruta_final, 
+                    "PDF",
+                    resolution=config_calidad["dpi"],
+                    quality=config_calidad["compresion"]
+                )
+                
+        messagebox.showinfo("Éxito", f"¡Conversión completada!\nCalidad utilizada: {calidad_elegida}")
         sys.exit(0)
         
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
 
 def lanzar_interfaz(rutas_imagenes):
-    # Crear ventana de opciones
     ventana = tk.Tk()
-    ventana.title("Convertidor a PDF (A4 Vertical)")
-    ventana.geometry("350x250")
+    ventana.title("Convertidor PDF")
+    ventana.geometry("380x360")
     ventana.resizable(False, False)
+    
+    try:
+        ventana.iconbitmap("logo.ico")
+    except:
+        pass
+        
+    # Cargar las opciones previas
+    config_guardada = cargar_configuracion()
+    
+    # Variables de Tkinter para los Radiobuttons
+    var_union = tk.StringVar(value=config_guardada.get("union", "Unido"))
+    var_color = tk.StringVar(value=config_guardada.get("color", "A Colores"))
+    var_calidad = tk.StringVar(value=config_guardada.get("calidad", "Alta"))
     
     tk.Label(ventana, text=f"Archivos seleccionados: {len(rutas_imagenes)}", font=("Arial", 10, "bold")).pack(pady=10)
     
-    # Opción de Unión/División
-    tk.Label(ventana, text="¿Cómo deseas los archivos?").pack()
-    combo_union = ttk.Combobox(ventana, values=["Unido (Un solo PDF)", "Dividido (Un PDF por imagen)"], state="readonly")
-    combo_union.set("Unido (Un solo PDF)")
-    combo_union.pack(pady=5)
+    # --- SECCIÓN: FORMATO DE SALIDA ---
+    marco_union = tk.LabelFrame(ventana, text="Formato de salida")
+    marco_union.pack(fill="x", padx=20, pady=5)
+    tk.Radiobutton(marco_union, text="Unido (Un solo PDF)", variable=var_union, value="Unido").pack(anchor="w", padx=10)
+    tk.Radiobutton(marco_union, text="Dividido (Un PDF por imagen)", variable=var_union, value="Dividido").pack(anchor="w", padx=10)
     
-    # Opción de Color
-    tk.Label(ventana, text="Configuración de color:").pack()
-    combo_color = ttk.Combobox(ventana, values=["A Colores", "Blanco y Negro"], state="readonly")
-    combo_color.set("A Colores")
-    combo_color.pack(pady=5)
+    # --- SECCIÓN: COLOR ---
+    marco_color = tk.LabelFrame(ventana, text="Configuración de Color")
+    marco_color.pack(fill="x", padx=20, pady=5)
+    tk.Radiobutton(marco_color, text="A Colores", variable=var_color, value="A Colores").pack(anchor="w", padx=10)
+    tk.Radiobutton(marco_color, text="Blanco y Negro", variable=var_color, value="Blanco y Negro").pack(anchor="w", padx=10)
+
+    # --- SECCIÓN: CALIDAD ---
+    marco_calidad = tk.LabelFrame(ventana, text="Calidad del PDF (A4 Vertical)")
+    marco_calidad.pack(fill="x", padx=20, pady=5)
+    # Organizamos los radiobuttons de calidad en una línea horizontal
+    frame_radios_calidad = tk.Frame(marco_calidad)
+    frame_radios_calidad.pack(pady=5)
+    tk.Radiobutton(frame_radios_calidad, text="Baja", variable=var_calidad, value="Baja").pack(side="left", padx=10)
+    tk.Radiobutton(frame_radios_calidad, text="Media", variable=var_calidad, value="Media").pack(side="left", padx=10)
+    tk.Radiobutton(frame_radios_calidad, text="Alta (300 DPI)", variable=var_calidad, value="Alta").pack(side="left", padx=10)
     
-    # Botón de acción
+    # --- BOTÓN DE ACCIÓN ---
     btn_convertir = tk.Button(
         ventana, 
         text="Transformar a PDF", 
         bg="#4CAF50", 
         fg="white", 
         font=("Arial", 11, "bold"),
-        command=lambda: ejecutar_conversion(rutas_imagenes, combo_union.get(), combo_color.get())
+        command=lambda: ejecutar_conversion(rutas_imagenes, var_union.get(), var_color.get(), var_calidad.get())
     )
-    btn_convertir.pack(pady=20)
+    btn_convertir.pack(pady=15)
     
     ventana.mainloop()
 
 if __name__ == "__main__":
-    # Windows pasa los archivos seleccionados como argumentos de línea de comandos (sys.argv)
-    # sys.argv[0] es la ruta del script, el resto son las imágenes
-    archivos = sys.argv[1:]
-    
-    if not archivos:
-        # Si se abre el script sin seleccionar archivos por error
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showwarning("Advertencia", "No se seleccionó ninguna imagen.")
-    else:
-        lanzar_interfaz(archivos)
+    try:
+        archivos = sys.argv[1:]
+        if not archivos:
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showwarning("Advertencia", "No se arrastró ni seleccionó ninguna imagen.")
+            root.destroy()
+        else:
+            lanzar_interfaz(archivos)
+            
+    except Exception:
+        error_completo = traceback.format_exc()
+        mostrar_error("Error Crítico de Inicio", error_completo)

@@ -1,6 +1,6 @@
 <div align="center">
   <h1>📄 Convertidor PDF Multipropósito</h1>
-  <p><i>Automatización de imágenes y documentos Word (.docx) a PDF (A4) con interfaz gráfica premium e independiente.</i></p>
+  <p><i>Automatización de imágenes, documentos Word (.docx) y combinación de archivos PDF a PDF (A4) con interfaz gráfica premium e independiente.</i></p>
   
   ![Python](https://img.shields.io/badge/Python-Script-blue?style=for-the-badge&logo=python&logoColor=white)
   ![Pillow](https://img.shields.io/badge/Pillow-Library-green?style=for-the-badge)
@@ -12,7 +12,7 @@
 ---
 
 > **Descripción**
-> Utilidad moderna con interfaz gráfica desarrollada en Python para automatizar la conversión de imágenes y documentos de Microsoft Word a formato PDF. Diseñada específicamente para optimizar el flujo de trabajo diario y organizar rápidamente documentos probatorios.
+> Utilidad moderna con interfaz gráfica desarrollada en Python para automatizar la conversión de imágenes, documentos de Microsoft Word y la unión de archivos PDF a formato PDF. Diseñada específicamente para optimizar el flujo de trabajo diario y organizar rápidamente documentos probatorios.
 
 ---
 
@@ -20,7 +20,8 @@
 
 * 🖥️ **Interfaz Gráfica Premium**: Tema azul oscuro con base en `#002060`, organización visual en tarjetas de configuración y controles modernos.
 * 📄 **Soporte Nativo de Word (.docx)**: Conversión directa de archivos Word a PDF manteniendo formato básico (negritas, cursivas, subrayados, listas de viñetas, tablas alineadas y encabezados) de forma local, **sin requerir Microsoft Office instalado**.
-* 📋 **Lista Visual Scrollable**: Muestra de manera clara la cola de archivos cargados con iconos indicativos para cada formato (📷 para imágenes, 📄 para documentos Word).
+* 📕 **Fusión de PDFs existentes**: Soporte nativo para importar, ordenar y fusionar múltiples documentos PDF en uno solo.
+* 📋 **Lista Visual Scrollable**: Muestra de manera clara la cola de archivos cargados con iconos indicativos para cada formato (📷 para imágenes, 📄 para documentos Word, 📕 para archivos PDF).
 * 🎛️ **Gestión de Cola**: Botones integrados para ordenar (**▲ Subir** / **▼ Bajar**) y eliminar (**🗑 Quitar**) archivos individuales antes de la conversión.
 * 📐 **Orientación Automática Inteligente**: Detección dinámica de imágenes horizontales para ajustar la página A4 en modo apaisado automáticamente, evitando distorsiones y manteniendo el flujo de página natural.
 * 📁 **Control de Salida Flexible**: Permite elegir una carpeta de destino personalizada para los PDFs resultantes y definir un nombre personalizado para la salida en modo unido.

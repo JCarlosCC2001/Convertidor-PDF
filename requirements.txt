@@ -2,3 +2,4 @@ Pillow
 python-docx
 reportlab
 pyinstaller
+pypdf

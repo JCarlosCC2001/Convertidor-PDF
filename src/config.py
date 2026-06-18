@@ -10,7 +10,8 @@ VERSION = "1.0.0"
 # --- Extensiones de archivos soportados ---
 EXTENSIONES_IMAGEN = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"}
 EXTENSIONES_WORD = {".docx"}
-EXTENSIONES_SOPORTADAS = EXTENSIONES_IMAGEN | EXTENSIONES_WORD
+EXTENSIONES_PDF = {".pdf"}
+EXTENSIONES_SOPORTADAS = EXTENSIONES_IMAGEN | EXTENSIONES_WORD | EXTENSIONES_PDF
 
 # --- Ruta del archivo de configuración (relativa al script, no al CWD) ---
 _DIR_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -87,12 +88,14 @@ def guardar_configuracion(**kwargs):
 
 
 def clasificar_archivo(ruta):
-    """Clasifica un archivo como 'imagen', 'word' o None según su extensión."""
+    """Clasifica un archivo como 'imagen', 'word', 'pdf' o None según su extensión."""
     ext = os.path.splitext(ruta)[1].lower()
     if ext in EXTENSIONES_IMAGEN:
         return "imagen"
     elif ext in EXTENSIONES_WORD:
         return "word"
+    elif ext in EXTENSIONES_PDF:
+        return "pdf"
     return None
 
 

@@ -6,7 +6,10 @@ los archivos por tipo y delegando al procesador correspondiente.
 """
 import os
 import logging
+import shutil
+import tempfile
 from PIL import Image, ImageOps
+from pypdf import PdfWriter
 from src.config import (
     CALIDADES, guardar_configuracion, clasificar_archivo,
     es_archivo_valido, EXTENSIONES_IMAGEN
@@ -135,12 +138,15 @@ def ejecutar_conversion(
     # Clasificar archivos
     imagenes = []
     documentos_word = []
+    archivos_pdf = []
     for ruta in rutas_archivos:
         tipo = clasificar_archivo(ruta)
         if tipo == "imagen":
             imagenes.append(ruta)
         elif tipo == "word":
             documentos_word.append(ruta)
+        elif tipo == "pdf":
+            archivos_pdf.append(ruta)
 
     config_calidad = CALIDADES[calidad_elegida]
     total_archivos = len(rutas_archivos)
@@ -148,8 +154,8 @@ def ejecutar_conversion(
     contador = 0
 
     logger.info(
-        "Iniciando conversión: %d imágenes, %d documentos Word | Modo: %s | Calidad: %s",
-        len(imagenes), len(documentos_word), opcion_union, calidad_elegida
+        "Iniciando conversión: %d imágenes, %d documentos Word, %d PDFs | Modo: %s | Calidad: %s",
+        len(imagenes), len(documentos_word), len(archivos_pdf), opcion_union, calidad_elegida
     )
 
     if opcion_union == "Unido":
@@ -159,55 +165,68 @@ def ejecutar_conversion(
             directorio_salida = os.path.dirname(rutas_archivos[0])
         ruta_final = os.path.join(directorio_salida, f"{nombre_pdf}.pdf")
 
-        # Para modo unido, solo se soportan imágenes (Word tiene formato propio)
-        if documentos_word and not imagenes:
-            # Solo hay documentos Word → convertirlos individualmente
-            for idx, ruta in enumerate(documentos_word, start=1):
-                contador += 1
-                if callback_progreso:
-                    callback_progreso(contador, total_archivos, f"Convirtiendo Word {idx}/{len(documentos_word)}...")
+        pdf_a_fusionar = []
+        archivos_temporales = []
 
-                ruta_pdf = _determinar_ruta_salida(ruta, directorio_salida)
-                convertir_word_a_pdf(ruta, ruta_pdf, callback_progreso, contador, total_archivos)
-                pdfs_generados.append(ruta_pdf)
+        try:
+            for idx, ruta in enumerate(rutas_archivos, start=1):
+                tipo = clasificar_archivo(ruta)
+                basename = os.path.basename(ruta)
 
-        elif imagenes:
-            # Procesar primera imagen
-            contador += 1
-            if callback_progreso:
-                callback_progreso(contador, total_archivos, f"Procesando imagen 1 de {len(imagenes)}...")
-
-            primera_img = procesar_imagen(imagenes[0], opcion_color, calidad_elegida, orientacion_auto)
-
-            # Generador perezoso para las imágenes restantes
-            def generador_imagenes():
-                nonlocal contador
-                for idx, r in enumerate(imagenes[1:], start=2):
-                    contador += 1
+                if tipo == "imagen":
                     if callback_progreso:
-                        callback_progreso(contador, total_archivos, f"Procesando imagen {idx} de {len(imagenes)}...")
-                    yield procesar_imagen(r, opcion_color, calidad_elegida, orientacion_auto)
+                        callback_progreso(idx, total_archivos, f"Procesando imagen: {basename}...")
 
-            primera_img.save(
-                ruta_final,
-                "PDF",
-                save_all=True,
-                append_images=generador_imagenes(),
-                resolution=config_calidad["dpi"],
-                quality=config_calidad["compresion"],
-            )
-            primera_img.close()
+                    img_procesada = procesar_imagen(ruta, opcion_color, calidad_elegida, orientacion_auto)
+                    temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+                    os.close(temp_fd)
+
+                    img_procesada.save(
+                        temp_path,
+                        "PDF",
+                        resolution=config_calidad["dpi"],
+                        quality=config_calidad["compresion"],
+                    )
+                    img_procesada.close()
+
+                    pdf_a_fusionar.append(temp_path)
+                    archivos_temporales.append(temp_path)
+
+                elif tipo == "word":
+                    if callback_progreso:
+                        callback_progreso(idx, total_archivos, f"Convirtiendo Word: {basename}...")
+
+                    temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+                    os.close(temp_fd)
+
+                    convertir_word_a_pdf(ruta, temp_path, callback_progreso, idx, total_archivos)
+
+                    pdf_a_fusionar.append(temp_path)
+                    archivos_temporales.append(temp_path)
+
+                elif tipo == "pdf":
+                    if callback_progreso:
+                        callback_progreso(idx, total_archivos, f"Preparando PDF: {basename}...")
+                    pdf_a_fusionar.append(ruta)
+
+            if callback_progreso:
+                callback_progreso(total_archivos, total_archivos, "Fusionando todos los archivos en un único PDF...")
+
+            merger = PdfWriter()
+            for pdf_path in pdf_a_fusionar:
+                merger.append(pdf_path)
+
+            merger.write(ruta_final)
+            merger.close()
             pdfs_generados.append(ruta_final)
 
-            # Convertir documentos Word aparte (no se pueden mezclar en el PDF de imágenes)
-            for idx, ruta in enumerate(documentos_word, start=1):
-                contador += 1
-                if callback_progreso:
-                    callback_progreso(contador, total_archivos, f"Convirtiendo Word {idx}/{len(documentos_word)}...")
-
-                ruta_pdf = _determinar_ruta_salida(ruta, directorio_salida)
-                convertir_word_a_pdf(ruta, ruta_pdf, callback_progreso, contador, total_archivos)
-                pdfs_generados.append(ruta_pdf)
+        finally:
+            for temp_path in archivos_temporales:
+                try:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except Exception as e:
+                    logger.warning("No se pudo eliminar el archivo temporal %s: %s", temp_path, e)
 
     else:
         # --- MODO DIVIDIDO: Un PDF por archivo ---
@@ -237,6 +256,17 @@ def ejecutar_conversion(
 
                 ruta_pdf = _determinar_ruta_salida(ruta, directorio_salida)
                 convertir_word_a_pdf(ruta, ruta_pdf, callback_progreso, contador, total_archivos)
+                pdfs_generados.append(ruta_pdf)
+
+            elif tipo == "pdf":
+                if callback_progreso:
+                    callback_progreso(contador, total_archivos, f"Procesando PDF {idx} de {total_archivos}...")
+
+                ruta_pdf = _determinar_ruta_salida(ruta, directorio_salida)
+                if os.path.abspath(ruta_pdf) == os.path.abspath(ruta):
+                    ruta_pdf = _determinar_ruta_salida(ruta, directorio_salida, sufijo="_copia")
+
+                shutil.copy(ruta, ruta_pdf)
                 pdfs_generados.append(ruta_pdf)
 
     if callback_progreso:

@@ -1,8 +1,8 @@
 {
     "union": "Dividido",
-    "color": "Blanco y Negro",
-    "calidad": "Alta",
-    "carpeta_salida": "",
+    "color": "A Colores",
+    "calidad": "Media",
+    "carpeta_salida": "D:\\Desarrollo Software\\Convertidor-PDF\\temp_test",
     "nombre_archivo": "",
     "orientacion_auto": true
 }

@@ -14,7 +14,7 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, filedialog
 from src.config import (
-    CALIDADES, EXTENSIONES_IMAGEN, EXTENSIONES_WORD,
+    CALIDADES, EXTENSIONES_IMAGEN, EXTENSIONES_WORD, EXTENSIONES_PDF,
     cargar_configuracion, clasificar_archivo, VERSION,
 )
 from src.converter import ejecutar_conversion
@@ -576,15 +576,17 @@ class ConvertidorGUI:
     # ---------- GESTIÓN DE ARCHIVOS ----------
 
     def seleccionar_archivos(self):
-        """Abre un diálogo para seleccionar imágenes y/o documentos Word."""
+        """Abre un diálogo para seleccionar imágenes, documentos Word y/o PDFs."""
         extensiones_img = " ".join(f"*{ext}" for ext in sorted(EXTENSIONES_IMAGEN))
         extensiones_word = " ".join(f"*{ext}" for ext in sorted(EXTENSIONES_WORD))
-        extensiones_todas = f"{extensiones_img} {extensiones_word}"
+        extensiones_pdf = " ".join(f"*{ext}" for ext in sorted(EXTENSIONES_PDF))
+        extensiones_todas = f"{extensiones_img} {extensiones_word} {extensiones_pdf}"
 
         tipos = [
             ("Todos los soportados", extensiones_todas),
             ("Imágenes", extensiones_img),
             ("Documentos Word", extensiones_word),
+            ("Archivos PDF", extensiones_pdf),
         ]
         archivos = filedialog.askopenfilenames(
             title="Seleccionar archivos para convertir",
@@ -646,6 +648,7 @@ class ConvertidorGUI:
 
         num_imagenes = 0
         num_word = 0
+        num_pdf = 0
 
         for ruta in self.rutas_archivos:
             nombre = os.path.basename(ruta)
@@ -656,6 +659,9 @@ class ConvertidorGUI:
             elif tipo == "word":
                 icono = "📄"
                 num_word += 1
+            elif tipo == "pdf":
+                icono = "📕"
+                num_pdf += 1
             else:
                 icono = "❓"
             self.listbox.insert(tk.END, f"  {icono}  {nombre}")
@@ -665,6 +671,8 @@ class ConvertidorGUI:
             partes.append(f"{num_imagenes} imagen{'es' if num_imagenes != 1 else ''}")
         if num_word:
             partes.append(f"{num_word} doc{'s' if num_word != 1 else ''} Word")
+        if num_pdf:
+            partes.append(f"{num_pdf} PDF{'s' if num_pdf != 1 else ''}")
 
         if partes:
             self.lbl_conteo.config(text=" + ".join(partes), fg=COLOR_TEXT_PRIMARY)

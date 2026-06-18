@@ -54,6 +54,7 @@ def compilar():
         "--name=ConvertidorPDF",   # Nombre del ejecutable
         "--collect-all", "reportlab",
         "--collect-all", "docx",
+        "--collect-all", "pypdf",
         RUTA_MAIN
     ]
 

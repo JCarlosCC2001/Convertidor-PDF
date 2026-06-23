@@ -5,6 +5,7 @@ import traceback
 from tkinter import messagebox
 from src.config import EXTENSIONES_SOPORTADAS
 from src.gui import ConvertidorGUI
+from src.single_instance import verificar_instancia_unica, iniciar_escucha_segundo_plano
 
 # Configurar logging al inicio
 logging.basicConfig(
@@ -39,9 +40,12 @@ def mostrar_error_critico(titulo, error):
 def main():
     """Punto de entrada principal de la aplicación."""
     try:
-        # Recuperar archivos pasados como argumentos (ej. al arrastrar y soltar)
         archivos_raw = sys.argv[1:]
         archivos = filtrar_archivos_validos(archivos_raw)
+
+        # Verificar si ya existe otra instancia abierta.
+        # Si existe, le enviará los archivos y cerrará este proceso.
+        verificar_instancia_unica(archivos)
 
         if archivos:
             logger.info("Archivos recibidos por argumento: %d", len(archivos))
@@ -49,6 +53,10 @@ def main():
         # Inicializar la interfaz gráfica de usuario
         root = tk.Tk()
         _app = ConvertidorGUI(root, rutas_iniciales=archivos)
+        
+        # Iniciar escucha en segundo plano para recibir archivos de nuevos clics derechos
+        iniciar_escucha_segundo_plano(_app.agregar_archivos_externos)
+        
         root.mainloop()
 
     except Exception:

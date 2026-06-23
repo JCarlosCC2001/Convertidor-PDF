@@ -600,6 +600,31 @@ class ConvertidorGUI:
                     existentes.add(a)
             self._actualizar_lista_archivos()
 
+    def agregar_archivos_externos(self, archivos):
+        """Agrega archivos provenientes de otra instancia lanzada (clic derecho adicional)."""
+        if not archivos:
+            return
+        # Ejecutamos en el hilo principal de Tkinter para que la UI se actualice seguro
+        self.root.after(0, self._agregar_archivos_externos_gui, archivos)
+
+    def _agregar_archivos_externos_gui(self, archivos):
+        existentes = set(self.rutas_archivos)
+        agregados = False
+        for a in archivos:
+            if a not in existentes:
+                self.rutas_archivos.append(a)
+                existentes.add(a)
+                agregados = True
+        
+        if agregados:
+            self._actualizar_lista_archivos()
+            # Restaurar/enfocar la ventana si estaba minimizada
+            if self.root.state() == 'iconic':
+                self.root.deiconify()
+            self.root.lift()
+            self.root.attributes('-topmost', True)
+            self.root.attributes('-topmost', False)
+
     def limpiar_archivos(self):
         """Elimina todos los archivos de la lista."""
         self.rutas_archivos.clear()

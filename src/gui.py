@@ -19,22 +19,22 @@ from src.config import (
 )
 from src.converter import ejecutar_conversion
 
-# ===== PALETA DE COLORES - TONALIDADES AZULES PREMIUM =====
-COLOR_BG = "#001333"
-COLOR_HEADER = "#002060"
-COLOR_CARD = "#001a40"
-COLOR_CARD_BORDER = "#003399"
-COLOR_TEXT_PRIMARY = "#ffffff"
-COLOR_TEXT_MUTED = "#8cadd3"
-COLOR_ACCENT = "#007acc"
-COLOR_ACCENT_HOVER = "#0099ff"
-COLOR_RADIO_SELECT = "#002b66"
-COLOR_DANGER = "#ff6666"
-COLOR_SUCCESS = "#4ec97a"
-COLOR_LIST_BG = "#000d26"
-COLOR_LIST_SELECT = "#003070"
-COLOR_ENTRY_BG = "#001029"
-COLOR_ENTRY_BORDER = "#003399"
+# ===== PALETA DE COLORES - TEMA CLARO =====
+COLOR_BG = "#f3f4f6"
+COLOR_HEADER = "#ffffff"
+COLOR_CARD = "#ffffff"
+COLOR_CARD_BORDER = "#d1d5db"
+COLOR_TEXT_PRIMARY = "#1f2937"
+COLOR_TEXT_MUTED = "#6b7280"
+COLOR_ACCENT = "#2563eb"
+COLOR_ACCENT_HOVER = "#1d4ed8"
+COLOR_RADIO_SELECT = "#e5e7eb"
+COLOR_DANGER = "#ef4444"
+COLOR_SUCCESS = "#10b981"
+COLOR_LIST_BG = "#ffffff"
+COLOR_LIST_SELECT = "#eff6ff"
+COLOR_ENTRY_BG = "#ffffff"
+COLOR_ENTRY_BORDER = "#d1d5db"
 
 
 # ===== TOOLTIP =====
@@ -59,7 +59,7 @@ class ToolTip:
         lbl = tk.Label(
             tw, text=self.texto,
             justify="left", relief="solid", borderwidth=1,
-            font=("Segoe UI", 8), bg="#1a1a2e", fg="#e0e0e0",
+            font=("Segoe UI", 8), bg="#1f2937", fg="#f9fafb",
             padx=8, pady=4,
         )
         lbl.pack()
@@ -74,8 +74,8 @@ class ToolTip:
 class CustomProgressBar(tk.Canvas):
     """Barra de progreso moderna con efecto shimmer animado."""
 
-    def __init__(self, parent, width=400, height=14, bg_color="#000d26",
-                 fill_color="#0099ff", shimmer_color="#66ccff", border_color="#003399"):
+    def __init__(self, parent, width=400, height=14, bg_color="#e5e7eb",
+                 fill_color="#2563eb", shimmer_color="#60a5fa", border_color="#d1d5db"):
         super().__init__(
             parent, width=width, height=height, bg=bg_color,
             highlightthickness=1, highlightbackground=border_color, bd=0,
@@ -132,7 +132,7 @@ class CustomProgressBar(tk.Canvas):
 
 # ===== INTERFAZ PRINCIPAL =====
 class ConvertidorGUI:
-    def __init__(self, root, rutas_iniciales=None):
+    def __init__(self, root, rutas_iniciales=None, accion_inicial=None):
         self.root = root
         self.rutas_archivos = list(rutas_iniciales) if rutas_iniciales else []
         self.is_converting = False
@@ -159,14 +159,58 @@ class ConvertidorGUI:
         self.var_color = tk.StringVar(value=self.config_guardada.get("color", "A Colores"))
         self.var_calidad = tk.StringVar(value=self.config_guardada.get("calidad", "Alta"))
         self.var_orientacion = tk.BooleanVar(value=self.config_guardada.get("orientacion_auto", True))
-        self.var_carpeta_salida = tk.StringVar(value=self.config_guardada.get("carpeta_salida", ""))
-        self.var_nombre_pdf = tk.StringVar(value=self.config_guardada.get("nombre_archivo", ""))
+        self.var_carpeta_salida = tk.StringVar(value="")  # Siempre vacío por defecto para que vaya a la carpeta original
+        self.var_nombre_pdf = tk.StringVar(value="")  # Siempre vacío por defecto
 
         # Construir la interfaz gráfica
         self.crear_interfaz()
 
+        # Aplicar accion inicial si existe
+        self._aplicar_accion(accion_inicial)
+
         # Iniciar verificación de actualizaciones en segundo plano
         threading.Thread(target=self.verificar_actualizaciones, daemon=True).start()
+
+    def _aplicar_accion(self, accion):
+        self.accion_actual = accion
+        if not accion:
+            return
+        if accion == "unir":
+            self.var_union.set("Unido")
+            self.var_color.set("A Colores")
+        elif accion == "dividir":
+            self.var_union.set("Dividido")
+            self.var_color.set("A Colores")
+        elif accion == "bn":
+            self.var_color.set("Blanco y Negro")
+        elif accion == "transformar":
+            pass
+        elif accion == "pdf2word":
+            # Ocultar opciones de color, calidad y unión porque no aplican
+            self.var_union.set("Dividido") # 1 PDF -> 1 Docx
+            try:
+                self.col_opciones.pack_forget()
+                self.btn_convertir.config(text="Convertir a Word")
+            except AttributeError:
+                pass
+        elif accion == "pdf2img":
+            self.var_union.set("Dividido")
+            try:
+                self.btn_convertir.config(text="Convertir a Imágenes")
+                # Ocultar panel derecho (Lista de archivos)
+                self.col_archivos.pack_forget()
+                # Ocultar opciones irrelevantes
+                self.card_formato.pack_forget()
+                self.card_salida.pack_forget()
+                
+                # Actualizar textos para que tenga sentido para imágenes
+                for widget in self.card_color.winfo_children():
+                    if isinstance(widget, tk.Label):
+                        widget.config(text="FORMATO DE IMAGEN")
+                self.rb_color.config(text="JPG (Imágenes a color)")
+                self.rb_bn.config(text="PNG (Escala de grises - Alta nitidez)")
+            except AttributeError:
+                pass
 
     def centrar_ventana(self, ancho, alto):
         """Centra la ventana principal en la pantalla del usuario."""
@@ -352,18 +396,20 @@ class ConvertidorGUI:
     # ---------- COMPONENTES DE VISTA DE EDICIÓN ----------
 
     def _crear_seccion_formato(self, parent):
-        card = self._crear_tarjeta(parent, "Formato de salida")
-        self._crear_radio(card, "Unido (Un solo PDF con todos los archivos)", self.var_union, "Unido").pack(anchor="w", pady=2)
-        self._crear_radio(card, "Dividido (Un PDF independiente por archivo)", self.var_union, "Dividido").pack(anchor="w", pady=2)
+        self.card_formato = self._crear_tarjeta(parent, "Formato de salida")
+        self._crear_radio(self.card_formato, "Unido (Un solo PDF con todos los archivos)", self.var_union, "Unido").pack(anchor="w", pady=2)
+        self._crear_radio(self.card_formato, "Dividido (Un PDF independiente por archivo)", self.var_union, "Dividido").pack(anchor="w", pady=2)
 
     def _crear_seccion_color(self, parent):
-        card = self._crear_tarjeta(parent, "Configuración de color (imágenes)")
-        self._crear_radio(card, "A Colores (Conserva los colores originales)", self.var_color, "A Colores").pack(anchor="w", pady=2)
-        self._crear_radio(card, "Blanco y Negro (Escala de grises)", self.var_color, "Blanco y Negro").pack(anchor="w", pady=2)
+        self.card_color = self._crear_tarjeta(parent, "Configuración de color (imágenes)")
+        self.rb_color = self._crear_radio(self.card_color, "A Colores (Conserva los colores originales)", self.var_color, "A Colores")
+        self.rb_color.pack(anchor="w", pady=2)
+        self.rb_bn = self._crear_radio(self.card_color, "Blanco y Negro (Escala de grises)", self.var_color, "Blanco y Negro")
+        self.rb_bn.pack(anchor="w", pady=2)
 
     def _crear_seccion_calidad(self, parent):
-        card = self._crear_tarjeta(parent, "Calidad (imágenes - Formato A4)")
-        frame_radios = tk.Frame(card, bg=COLOR_CARD)
+        self.card_calidad = self._crear_tarjeta(parent, "Calidad / Tamaño")
+        frame_radios = tk.Frame(self.card_calidad, bg=COLOR_CARD)
         frame_radios.pack(fill="x", pady=2)
 
         for cal, info in CALIDADES.items():
@@ -372,7 +418,7 @@ class ConvertidorGUI:
             ToolTip(radio, info.get("descripcion", ""))
 
         chk_orientacion = tk.Checkbutton(
-            card, text="Orientación automática (horizontal/vertical)",
+            self.card_calidad, text="Orientación automática (horizontal/vertical)",
             variable=self.var_orientacion,
             font=("Segoe UI", 8), bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
             activebackground=COLOR_CARD, activeforeground=COLOR_TEXT_PRIMARY,
@@ -382,10 +428,10 @@ class ConvertidorGUI:
         ToolTip(chk_orientacion, "Detecta si la imagen es horizontal y rota la página automáticamente")
 
     def _crear_seccion_salida(self, parent):
-        card = self._crear_tarjeta(parent, "Opciones de salida")
+        self.card_salida = self._crear_tarjeta(parent, "Opciones de salida")
 
         # Carpeta de destino
-        frame_carpeta = tk.Frame(card, bg=COLOR_CARD)
+        frame_carpeta = tk.Frame(self.card_salida, bg=COLOR_CARD)
         frame_carpeta.pack(fill="x", pady=2)
         tk.Label(
             frame_carpeta, text="Carpeta:", font=("Segoe UI", 8, "bold"),
@@ -406,7 +452,7 @@ class ConvertidorGUI:
         btn_carpeta.pack(side="right")
 
         # Nombre personalizado
-        frame_nombre = tk.Frame(card, bg=COLOR_CARD)
+        frame_nombre = tk.Frame(self.card_salida, bg=COLOR_CARD)
         frame_nombre.pack(fill="x", pady=2)
         tk.Label(
             frame_nombre, text="Nombre:", font=("Segoe UI", 8, "bold"),
@@ -513,11 +559,19 @@ class ConvertidorGUI:
         self.container_carga.pack_forget()
         self.progreso.detener_shimmer()
 
-        self.lbl_detalle_exito.config(
-            text=f"Total de PDFs creados: {num_pdfs}\n"
-                 f"Calidad del renderizado: {calidad}\n\n"
-                 f"Ubicación de guardado:\n{ubicacion}"
-        )
+        if getattr(self, "accion_actual", "") == "pdf2word":
+            texto_exito = (f"Total de documentos Word creados: {num_pdfs}\n\n"
+                           f"Ubicación de guardado:\n{ubicacion}")
+        elif getattr(self, "accion_actual", "") == "pdf2img":
+            texto_exito = (f"Total de imágenes creadas: {num_pdfs}\n"
+                           f"Calidad (Resolución): {calidad}\n\n"
+                           f"Ubicación de guardado:\n{ubicacion}")
+        else:
+            texto_exito = (f"Total de PDFs creados: {num_pdfs}\n"
+                           f"Calidad del renderizado: {calidad}\n\n"
+                           f"Ubicación de guardado:\n{ubicacion}")
+
+        self.lbl_detalle_exito.config(text=texto_exito)
         self.container_completado.pack(fill="both", expand=True)
 
     def mostrar_vista_edicion(self):
@@ -600,21 +654,25 @@ class ConvertidorGUI:
                     existentes.add(a)
             self._actualizar_lista_archivos()
 
-    def agregar_archivos_externos(self, archivos):
+    def agregar_archivos_externos(self, archivos, accion=None):
         """Agrega archivos provenientes de otra instancia lanzada (clic derecho adicional)."""
-        if not archivos:
+        if not archivos and not accion:
             return
         # Ejecutamos en el hilo principal de Tkinter para que la UI se actualice seguro
-        self.root.after(0, self._agregar_archivos_externos_gui, archivos)
+        self.root.after(0, self._agregar_archivos_externos_gui, archivos, accion)
 
-    def _agregar_archivos_externos_gui(self, archivos):
+    def _agregar_archivos_externos_gui(self, archivos, accion):
+        if accion:
+            self._aplicar_accion(accion)
+            
         existentes = set(self.rutas_archivos)
         agregados = False
-        for a in archivos:
-            if a not in existentes:
-                self.rutas_archivos.append(a)
-                existentes.add(a)
-                agregados = True
+        if archivos:
+            for a in archivos:
+                if a not in existentes:
+                    self.rutas_archivos.append(a)
+                    existentes.add(a)
+                    agregados = True
         
         if agregados:
             self._actualizar_lista_archivos()
@@ -712,7 +770,7 @@ class ConvertidorGUI:
             if self.rutas_archivos and not self.is_converting:
                 self.btn_convertir.config(state="normal", bg=COLOR_ACCENT)
             else:
-                self.btn_convertir.config(state="disabled", bg="#4f5d75")
+                self.btn_convertir.config(state="disabled", bg="#d1d5db", fg="#9ca3af")
 
     # ---------- CONVERSIÓN ----------
 
@@ -762,16 +820,33 @@ class ConvertidorGUI:
     def _hilo_conversion(self):
         """Ejecuta la conversión en segundo plano."""
         try:
-            self._pdfs_generados = ejecutar_conversion(
-                self.rutas_archivos,
-                self.var_union.get(),
-                self.var_color.get(),
-                self.var_calidad.get(),
-                directorio_salida=self.var_carpeta_salida.get(),
-                nombre_personalizado=self.var_nombre_pdf.get(),
-                orientacion_auto=self.var_orientacion.get(),
-                callback_progreso=self._callback_progreso_seguro,
-            )
+            if getattr(self, "accion_actual", "") == "pdf2word":
+                from src.pdf2word_converter import convertir_pdf_a_word_batch
+                self._pdfs_generados = convertir_pdf_a_word_batch(
+                    self.rutas_archivos,
+                    directorio_salida=self.var_carpeta_salida.get(),
+                    callback_progreso=self._callback_progreso_seguro
+                )
+            elif getattr(self, "accion_actual", "") == "pdf2img":
+                from src.pdf2img_converter import convertir_pdf_a_imagen_batch
+                self._pdfs_generados = convertir_pdf_a_imagen_batch(
+                    self.rutas_archivos,
+                    calidad_elegida=self.var_calidad.get(),
+                    modo_color=self.var_color.get(),
+                    directorio_salida=self.var_carpeta_salida.get(),
+                    callback_progreso=self._callback_progreso_seguro
+                )
+            else:
+                self._pdfs_generados = ejecutar_conversion(
+                    self.rutas_archivos,
+                    self.var_union.get(),
+                    self.var_color.get(),
+                    self.var_calidad.get(),
+                    directorio_salida=self.var_carpeta_salida.get(),
+                    nombre_personalizado=self.var_nombre_pdf.get(),
+                    orientacion_auto=self.var_orientacion.get(),
+                    callback_progreso=self._callback_progreso_seguro,
+                )
             self.root.after(0, self._conversion_exitosa)
         except Exception as e:
             self.root.after(0, self._conversion_fallida, str(e))

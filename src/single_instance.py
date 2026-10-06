@@ -11,7 +11,7 @@ HOST = '127.0.0.1'
 
 _server_socket = None
 
-def verificar_instancia_unica(archivos):
+def verificar_instancia_unica(archivos, accion=None):
     """
     Verifica si ya hay otra instancia corriendo.
     Si la hay, le manda los archivos a través de un socket local y termina el programa actual.
@@ -28,9 +28,10 @@ def verificar_instancia_unica(archivos):
         # Ya hay otra instancia corriendo en ese puerto
         try:
             with socket.create_connection((HOST, PORT), timeout=1) as sock:
-                if archivos:
+                if archivos or accion:
                     # Enviar los archivos como JSON codificado
-                    data = json.dumps(archivos).encode('utf-8')
+                    payload = {"archivos": archivos, "accion": accion}
+                    data = json.dumps(payload).encode('utf-8')
                     sock.sendall(data)
         except Exception as e:
             logger.error("Error al enviar archivos a la instancia principal: %s", e)
@@ -54,9 +55,12 @@ def iniciar_escucha_segundo_plano(callback):
                     data = conn.recv(65536)
                     if data:
                         try:
-                            archivos = json.loads(data.decode('utf-8'))
-                            if archivos:
-                                callback(archivos)
+                            payload = json.loads(data.decode('utf-8'))
+                            if isinstance(payload, dict):
+                                callback(payload.get("archivos", []), payload.get("accion"))
+                            elif isinstance(payload, list):
+                                # retrocompatibilidad
+                                callback(payload, None)
                         except json.JSONDecodeError:
                             pass
             except Exception as e:

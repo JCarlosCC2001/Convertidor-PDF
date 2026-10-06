@@ -55,6 +55,7 @@ def compilar():
         "--collect-all", "reportlab",
         "--collect-all", "docx",
         "--collect-all", "pypdf",
+        "--collect-all", "pymupdf",
         RUTA_MAIN
     ]
 
@@ -77,6 +78,7 @@ def compilar():
     # Sintaxis de --add-data en Windows: "origen;destino_dentro_del_exe"
     add_data_exe = f"dist/ConvertidorPDF.exe;."
     add_data_logo = f"logo.ico;."
+    add_data_config = f"src/config.py;src"
 
     pyinstaller_installer_cmd = [
         python_exe, "-m", "PyInstaller",
@@ -85,6 +87,7 @@ def compilar():
         f"--icon={RUTA_LOGO_ICO}",
         "--add-data", add_data_exe,
         "--add-data", add_data_logo,
+        "--add-data", add_data_config,
         "--name=Instalador_ConvertidorPDF",
         ruta_installer_script
     ]

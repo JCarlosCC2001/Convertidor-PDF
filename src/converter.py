@@ -55,6 +55,24 @@ def procesar_imagen(ruta_img, modo_color, calidad_elegida, orientacion_auto=True
         return img_final
 
 
+def procesar_pdf_bw(ruta_entrada, ruta_salida, callback_progreso=None, offset=0, total=1):
+    """Convierte un PDF a escala de grises rasterizando sus páginas."""
+    import fitz  # PyMuPDF
+    doc = fitz.open(ruta_entrada)
+    if callback_progreso:
+        callback_progreso(offset, total, f"Convirtiendo PDF a B/N: {os.path.basename(ruta_entrada)}...")
+    
+    doc_out = fitz.open()
+    for page in doc:
+        pix = page.get_pixmap(colorspace=fitz.csGRAY, dpi=150)
+        new_page = doc_out.new_page(width=page.rect.width, height=page.rect.height)
+        new_page.insert_image(new_page.rect, pixmap=pix)
+    
+    doc_out.save(ruta_salida)
+    doc_out.close()
+    doc.close()
+
+
 def _validar_archivos(rutas):
     """Valida todos los archivos antes de iniciar la conversión.
     
@@ -87,6 +105,25 @@ def _determinar_ruta_salida(ruta_archivo, directorio_salida, nombre_personalizad
         nombre = os.path.splitext(os.path.basename(ruta_archivo))[0] + sufijo
 
     return os.path.join(directorio_salida, f"{nombre}.pdf")
+
+
+def limpiar_metadatos_pdf(ruta_pdf):
+    """Elimina los metadatos de un archivo PDF."""
+    try:
+        writer = PdfWriter()
+        writer.append(ruta_pdf)
+        writer.add_metadata({})  # Vaciar metadatos
+        
+        temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+        os.close(temp_fd)
+        
+        writer.write(temp_path)
+        writer.close()
+        
+        shutil.move(temp_path, ruta_pdf)
+        logger.debug("Metadatos limpiados de: %s", os.path.basename(ruta_pdf))
+    except Exception as e:
+        logger.warning("No se pudo limpiar metadatos de %s: %s", ruta_pdf, e)
 
 
 def ejecutar_conversion(
@@ -158,6 +195,9 @@ def ejecutar_conversion(
         len(imagenes), len(documentos_word), len(archivos_pdf), opcion_union, calidad_elegida
     )
 
+    if directorio_salida and not os.path.exists(directorio_salida):
+        os.makedirs(directorio_salida, exist_ok=True)
+
     if opcion_union == "Unido":
         # --- MODO UNIDO: Todo en un solo PDF ---
         nombre_pdf = nombre_personalizado if nombre_personalizado else "archivos_unidos"
@@ -201,13 +241,28 @@ def ejecutar_conversion(
 
                     convertir_word_a_pdf(ruta, temp_path, callback_progreso, idx, total_archivos)
 
-                    pdf_a_fusionar.append(temp_path)
-                    archivos_temporales.append(temp_path)
+                    if opcion_color == "Blanco y Negro":
+                        temp_fd_bw, temp_path_bw = tempfile.mkstemp(suffix=".pdf")
+                        os.close(temp_fd_bw)
+                        procesar_pdf_bw(temp_path, temp_path_bw, callback_progreso, idx, total_archivos)
+                        pdf_a_fusionar.append(temp_path_bw)
+                        archivos_temporales.extend([temp_path, temp_path_bw])
+                    else:
+                        pdf_a_fusionar.append(temp_path)
+                        archivos_temporales.append(temp_path)
 
                 elif tipo == "pdf":
                     if callback_progreso:
                         callback_progreso(idx, total_archivos, f"Preparando PDF: {basename}...")
-                    pdf_a_fusionar.append(ruta)
+                    
+                    if opcion_color == "Blanco y Negro":
+                        temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+                        os.close(temp_fd)
+                        procesar_pdf_bw(ruta, temp_path, callback_progreso, idx, total_archivos)
+                        pdf_a_fusionar.append(temp_path)
+                        archivos_temporales.append(temp_path)
+                    else:
+                        pdf_a_fusionar.append(ruta)
 
             if callback_progreso:
                 callback_progreso(total_archivos, total_archivos, "Fusionando todos los archivos en un único PDF...")
@@ -256,6 +311,13 @@ def ejecutar_conversion(
 
                 ruta_pdf = _determinar_ruta_salida(ruta, directorio_salida)
                 convertir_word_a_pdf(ruta, ruta_pdf, callback_progreso, contador, total_archivos)
+                
+                if opcion_color == "Blanco y Negro":
+                    temp_fd_bw, temp_path_bw = tempfile.mkstemp(suffix=".pdf")
+                    os.close(temp_fd_bw)
+                    procesar_pdf_bw(ruta_pdf, temp_path_bw, callback_progreso, contador, total_archivos)
+                    shutil.move(temp_path_bw, ruta_pdf)
+                
                 pdfs_generados.append(ruta_pdf)
 
             elif tipo == "pdf":
@@ -266,8 +328,17 @@ def ejecutar_conversion(
                 if os.path.abspath(ruta_pdf) == os.path.abspath(ruta):
                     ruta_pdf = _determinar_ruta_salida(ruta, directorio_salida, sufijo="_copia")
 
-                shutil.copy(ruta, ruta_pdf)
+                if opcion_color == "Blanco y Negro":
+                    procesar_pdf_bw(ruta, ruta_pdf, callback_progreso, contador, total_archivos)
+                else:
+                    shutil.copy(ruta, ruta_pdf)
                 pdfs_generados.append(ruta_pdf)
+
+    if callback_progreso:
+        callback_progreso(total_archivos, total_archivos, "Limpiando metadatos de los PDFs generados...")
+
+    for pdf in pdfs_generados:
+        limpiar_metadatos_pdf(pdf)
 
     if callback_progreso:
         callback_progreso(total_archivos, total_archivos, "¡Conversión finalizada con éxito!")

@@ -4,7 +4,7 @@ import tkinter as tk
 import traceback
 from tkinter import messagebox
 from src.config import EXTENSIONES_SOPORTADAS
-from src.gui import ConvertidorGUI
+from src.dashboard import DashboardGUI
 from src.single_instance import verificar_instancia_unica, iniciar_escucha_segundo_plano
 
 # Configurar logging al inicio
@@ -40,19 +40,25 @@ def mostrar_error_critico(titulo, error):
 def main():
     """Punto de entrada principal de la aplicación."""
     try:
-        archivos_raw = sys.argv[1:]
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--accion', type=str, default=None)
+        args, unknown = parser.parse_known_args()
+
+        archivos_raw = [a for a in unknown if not a.startswith('--')]
         archivos = filtrar_archivos_validos(archivos_raw)
+        accion = args.accion
 
         # Verificar si ya existe otra instancia abierta.
         # Si existe, le enviará los archivos y cerrará este proceso.
-        verificar_instancia_unica(archivos)
+        verificar_instancia_unica(archivos, accion)
 
         if archivos:
             logger.info("Archivos recibidos por argumento: %d", len(archivos))
 
-        # Inicializar la interfaz gráfica de usuario
+        # Inicializar la interfaz gráfica de usuario (Dashboard Central)
         root = tk.Tk()
-        _app = ConvertidorGUI(root, rutas_iniciales=archivos)
+        _app = DashboardGUI(root, rutas_iniciales=archivos, accion_inicial=accion)
         
         # Iniciar escucha en segundo plano para recibir archivos de nuevos clics derechos
         iniciar_escucha_segundo_plano(_app.agregar_archivos_externos)
